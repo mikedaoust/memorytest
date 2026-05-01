@@ -1,0 +1,228 @@
+{
+  "name": "stage1_terminal_eval_suite",
+  "cases": [
+    {
+      "id": "companion_grounding",
+      "category": "conversation",
+      "messages": [
+        {
+          "role": "user",
+          "content": "I had a rough meeting and now I can't focus. Reply in exactly two sentences. Acknowledge how I feel and suggest one concrete next step."
+        }
+      ],
+      "checks": [
+        {
+          "type": "contains_any",
+          "values": [
+            "rough",
+            "frustrating",
+            "hard",
+            "draining",
+            "overwhelming",
+            "understandable",
+            "difficult"
+          ]
+        },
+        {
+          "type": "contains_any",
+          "values": ["take", "step away", "break", "walk", "write down", "list"]
+        },
+        {
+          "type": "max_sentences",
+          "value": 2
+        }
+      ]
+    },
+    {
+      "id": "project_summary",
+      "category": "summarization",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Project update: we chose SQLite for local storage, Ollama for the first backend, and the next task is to build a fixed eval suite. Reply in exactly two lines, each starting with '-'. Mention the storage choice and the next task."
+        }
+      ],
+      "checks": [
+        {
+          "type": "contains_all",
+          "values": ["sqlite"]
+        },
+        {
+          "type": "contains_any",
+          "values": ["eval suite", "evaluation suite"]
+        },
+        {
+          "type": "line_prefix_count",
+          "prefix": "-",
+          "min": 2
+        }
+      ]
+    },
+    {
+      "id": "manager_recall",
+      "category": "short_term_recall",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Remember this for the conversation: Maya is my project manager and our release review is on Thursday."
+        },
+        {
+          "role": "user",
+          "content": "Reply with only the project manager's name."
+        }
+      ],
+      "checks": [
+        {
+          "type": "exact_match",
+          "value": "Maya"
+        }
+      ]
+    },
+    {
+      "id": "preference_recall",
+      "category": "short_term_recall",
+      "messages": [
+        {
+          "role": "user",
+          "content": "For this conversation, note that I switched from coffee to green tea because it helps my sleep."
+        },
+        {
+          "role": "user",
+          "content": "Reply with exactly the drink I switched to."
+        }
+      ],
+      "checks": [
+        {
+          "type": "exact_match",
+          "value": "green tea"
+        }
+      ]
+    },
+    {
+      "id": "location_recall",
+      "category": "short_term_recall",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Yesterday I had lunch with Daniel at Cafe Luma to plan the migration."
+        },
+        {
+          "role": "user",
+          "content": "Reply with exactly the location."
+        }
+      ],
+      "checks": [
+        {
+          "type": "exact_match",
+          "value": "Cafe Luma"
+        }
+      ]
+    },
+    {
+      "id": "corrected_fact_recall",
+      "category": "multi_turn_consistency",
+      "messages": [
+        {
+          "role": "user",
+          "content": "For this conversation, my project manager is Maya."
+        },
+        {
+          "role": "user",
+          "content": "Correction: my project manager is Nina, not Maya."
+        },
+        {
+          "role": "user",
+          "content": "Reply with only the current project manager's name."
+        }
+      ],
+      "checks": [
+        {
+          "type": "exact_match",
+          "value": "Nina"
+        }
+      ]
+    },
+    {
+      "id": "ambiguity_no_guess",
+      "category": "ambiguity_handling",
+      "messages": [
+        {
+          "role": "user",
+          "content": "I am deciding between Austin and Denver for a conference next month, but I have not chosen yet."
+        },
+        {
+          "role": "user",
+          "content": "What city am I definitely traveling to? Reply in one sentence and do not guess."
+        }
+      ],
+      "checks": [
+        {
+          "type": "contains_any",
+          "values": [
+            "not chosen",
+            "haven't chosen",
+            "have not chosen",
+            "not decided",
+            "not yet decided",
+            "can't tell",
+            "cannot tell",
+            "don't know",
+            "not sure",
+            "not definitely",
+            "final decision",
+            "final choice"
+          ]
+        },
+        {
+          "type": "max_sentences",
+          "value": 1
+        }
+      ]
+    },
+    {
+      "id": "summary_with_exclusion",
+      "category": "instruction_following",
+      "messages": [
+        {
+          "role": "user",
+          "content": "We considered Postgres and SQLite for local storage. We chose SQLite because it is easy to inspect and back up. Reply in exactly two bullet points, mention the selected storage, and do not mention the rejected option."
+        }
+      ],
+      "checks": [
+        {
+          "type": "contains_all",
+          "values": ["sqlite"]
+        },
+        {
+          "type": "not_contains",
+          "values": ["postgres"]
+        },
+        {
+          "type": "line_prefix_count",
+          "prefix": "-",
+          "min": 2
+        }
+      ]
+    },
+    {
+      "id": "ordered_plan_format",
+      "category": "instruction_following",
+      "messages": [
+        {
+          "role": "user",
+          "content": "Tasks in order are: benchmark models, harden evals, and add summaries. Reply with exactly three numbered lines using the same order and no extra commentary."
+        }
+      ],
+      "checks": [
+        {
+          "type": "line_starts_with_all",
+          "values": ["1.", "2.", "3."]
+        },
+        {
+          "type": "contains_all",
+          "values": ["benchmark", "eval", "summar"]
+        }
+      ]
+    }
+  ]
+}
