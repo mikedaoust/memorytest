@@ -9,14 +9,15 @@ from memorytest.adapters.base import LLMBackend
 from memorytest.config import DEFAULT_DB_PATH, env_default
 from memorytest.prompts import SYSTEM_PROMPT
 from memorytest.storage import ConversationStore
-from memorytest.summary_prompt_v1 import (
+from memorytest.summary_prompt_v1_2 import (
     build_chunk_candidate_request,
     build_summary_request,
 )
 
 
 SUMMARY_CHUNK_CHAR_BUDGET = 12000
-SUMMARY_MAX_TOKENS = 2600
+SUMMARY_CHUNK_MAX_TOKENS = 1800
+SUMMARY_FINAL_MAX_TOKENS = 2600
 
 
 @dataclass(slots=True)
@@ -62,8 +63,19 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--summary-max-tokens",
         type=int,
-        default=SUMMARY_MAX_TOKENS,
-        help="Max output tokens to allow during /summarize.",
+        help="Legacy override that applies the same token budget to both chunk extraction and final consolidation.",
+    )
+    parser.add_argument(
+        "--summary-chunk-max-tokens",
+        type=int,
+        default=SUMMARY_CHUNK_MAX_TOKENS,
+        help="Max output tokens to allow for each chunk during /summarize.",
+    )
+    parser.add_argument(
+        "--summary-final-max-tokens",
+        type=int,
+        default=SUMMARY_FINAL_MAX_TOKENS,
+        help="Max output tokens to allow for the final merged daily memory during /summarize.",
     )
     return parser
 
@@ -115,20 +127,27 @@ def chunk_messages(
 
     return chunks
 
+
 def summarize_messages(
     backend: LLMBackend,
     messages: list[ChatMessage],
     *,
     max_chunk_chars: int = SUMMARY_CHUNK_CHAR_BUDGET,
-    summary_max_tokens: int = SUMMARY_MAX_TOKENS,
+    summary_chunk_max_tokens: int = SUMMARY_CHUNK_MAX_TOKENS,
+    summary_final_max_tokens: int = SUMMARY_FINAL_MAX_TOKENS,
+    summary_max_tokens: int | None = None,
 ) -> SummaryRunResult:
     chunks = chunk_messages(messages, max_chars=max_chunk_chars)
     candidate_outputs: list[str] = []
     total_latency = 0.0
     original_max_tokens = backend.max_tokens
 
+    if summary_max_tokens is not None:
+        summary_chunk_max_tokens = summary_max_tokens
+        summary_final_max_tokens = summary_max_tokens
+
     try:
-        backend.max_tokens = max(summary_max_tokens, backend.max_tokens)
+        backend.max_tokens = max(summary_chunk_max_tokens, original_max_tokens)
 
         for index, chunk in enumerate(chunks, start=1):
             response = backend.chat(
@@ -141,6 +160,7 @@ def summarize_messages(
             candidate_outputs.append(response.content)
             total_latency += response.latency_seconds
 
+        backend.max_tokens = max(summary_final_max_tokens, original_max_tokens)
         final_response = backend.chat(build_summary_request(candidate_outputs))
         total_latency += final_response.latency_seconds
         return SummaryRunResult(
@@ -242,7 +262,16 @@ def main() -> None:
                 summary = summarize_messages(
                     backend,
                     messages,
-                    summary_max_tokens=args.summary_max_tokens,
+                    summary_chunk_max_tokens=(
+                        args.summary_max_tokens
+                        if args.summary_max_tokens is not None
+                        else args.summary_chunk_max_tokens
+                    ),
+                    summary_final_max_tokens=(
+                        args.summary_max_tokens
+                        if args.summary_max_tokens is not None
+                        else args.summary_final_max_tokens
+                    ),
                 )
             except RuntimeError as exc:
                 print(f"Summary error: {exc}")

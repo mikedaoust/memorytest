@@ -20,13 +20,14 @@ Run the terminal chat with Ollama:
 PYTHONPATH=src python3 -m memorytest.chat --backend ollama --model qwen3.5:35b-a3b-q4_K_M
 ```
 
-For long `/summarize` runs, you can raise the summary output budget if needed:
+For long `/summarize` runs, you can tune chunk extraction and final consolidation separately:
 
 ```bash
 PYTHONPATH=src python3 -m memorytest.chat \
   --backend ollama \
   --model qwen3.5:35b-a3b-q4_K_M \
-  --summary-max-tokens 2600
+  --summary-chunk-max-tokens 2200 \
+  --summary-final-max-tokens 2600
 ```
 
 Inside the terminal chat, useful commands include:
@@ -75,5 +76,6 @@ PYTHONPATH=src python3 -m unittest discover -s tests
 - For Ollama, the benchmark now reports both wall-clock latency and average generated tokens per second when the backend exposes raw timing metrics.
 - The first eval suite is intentionally narrow and heuristic-based. It is meant to catch obvious regressions before richer episodic-memory evals exist.
 - The summarizer now uses a two-stage pipeline so long sessions are handled as chunk candidates that merge into one day-memory, rather than stitched mini-day summaries.
-- Summary generation now has its own configurable output budget via `--summary-max-tokens` so long daily artifacts do not inherit the shorter normal chat limit. The current default is `2600`.
+- Summary generation now has separate configurable output budgets for chunk extraction and final consolidation. The current defaults are `1800` for `--summary-chunk-max-tokens` and `2600` for `--summary-final-max-tokens`.
+- The legacy `--summary-max-tokens` flag still works and applies the same token budget to both chunk extraction and final consolidation.
 - The terminal scaffold intentionally focuses on dependable transcript persistence first. Long-term episodic memory extraction is still a later stage.

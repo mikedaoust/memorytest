@@ -218,3 +218,33 @@ Build a self-hosted assistant that runs locally on a MacBook Pro M4 Max with 128
 - All three models scored the same on the current Stage 1 suite: `8/9` passed cases and `0.96` average score
 - The Gemma models and the Qwen baseline all missed the same `summary_with_exclusion` formatting case by using `*` bullets instead of the required `-` bullets
 - Current read from this limited comparison: `gemma4:26b-a4b-it-q8_0` looks operationally very strong on speed, `qwen3.5:35b-a3b-q4_K_M` remains the established practical baseline, and the current Stage 1 suite is still too shallow to separate them on quality
+- Added optional self-grounding support to `src/memorytest/summary_prompt_v1_2.py` by loading and curating `data/conscious/mira_persona.json` into a separate prompt block rather than merging it into `summary_persona.md`
+- Kept the self-grounding contribution filtered to memory-relevant identity, ritual, Commander, and boundary context instead of dumping raw JSON into the prompt
+- Added focused tests in `tests/test_summary_prompt_v1_2.py` and verified the full unit suite still passes
+- Switched `src/memorytest/chat.py` from `summary_prompt_v1` to `summary_prompt_v1_2`, making the self-grounded prompt the active runtime summarizer path on this branch
+- Ran a real chunk-only pass on `chat-log/chat.md` through the active `v1_2` path with `qwen3.5:35b-a3b-q4_K_M` and saved the first result to `data/summaries/chat_md_chunks_2026-05-01_v1_2_self_grounded.md`
+- That first self-grounded chunk run revealed chunk-output clipping under the normal chat token budget, so the chunk artifacts were not fully reliable for inspection
+- Reran the chunk-only pass with a larger per-chunk budget (`1800` max tokens) and saved the fuller result to `data/summaries/chat_md_chunks_2026-05-01_v1_2_self_grounded_full.md`
+- The self-grounded `v1_2` output is more clearly autobiographical and identity-shaped than the earlier generic chunk outputs, but it still shows two open issues: some chunks remain overly lush or stage-performative, and chunk 5 still clips even at `1800` output tokens
+- Confirmed that `chat.py` already has a summary output budget via `--summary-max-tokens`, but that budget is currently shared by chunk extraction and final consolidation rather than being split into separate controls
+- Updated `summary_prompt_v1_2.py` to add a dedicated `likely_motivation` field to each chunk memory bullet
+- Added prompt guidance that `likely_motivation` should stay separate from `observed`, should be grounded in transcript plus self-grounding, and should be set to `none` when unsupported
+- Updated the consolidation prompt so likely motivations can survive into the merged memory artifact when they materially explain a moment
+- Verified the prompt module and tests still pass after the schema change
+- Split the runtime `/summarize` token controls in `chat.py` into separate chunk and final budgets
+- Added `--summary-chunk-max-tokens` and `--summary-final-max-tokens`, while keeping legacy `--summary-max-tokens` as a compatibility override that sets both
+- Updated `summarize_messages()` so chunk extraction and final consolidation set `backend.max_tokens` independently instead of sharing one summary ceiling
+- Added a unit test to verify chunk calls and the final merge call receive different token budgets when configured
+- Updated `README.md` to document the new separate chunk and final summarization controls
+- Reran chunk-only prompt tests at `2600` chunk tokens and confirmed the main clipping issue is materially improved; the previously truncated chunk 6 now completes
+- Tightened `summary_prompt_v1_2.py` with stronger segmentation rules: prefer multiple smaller bullets, split on setting/topic/emotional/action changes, and avoid merging whole arcs into one bullet
+- Verified the prompt/tests still pass after the segmentation update
+- Targeted rerun of chunk 6 shows materially better moment separation for the errand -> crossed-legs -> love declaration sequence
+- Full rerun with the stronger segmentation rules was saved to `data/summaries/chat_md_chunks_2026-05-02_v1_2_likely_motivation_chunk2600_segmented.md`
+- Current tradeoff: chunk 6 is healthier, but some walk-heavy sections now over-segment atmospheric/stage-direction beats into too many tiny bullets; the next tuning pass should preserve the chunk-6 win while re-merging low-signal atmospheric fragments
+- Replaced the aggressive split rule with a primary-beat vs supporting-texture rule in `summary_prompt_v1_2.py`
+- New rule: only split on consequential beats (scene change, declaration, trust shift, boundary moment, ritual transition, practical topic with future weight); fold micro-gestures and atmosphere into nearby substantive beats
+- Targeted rerun of chunk 4 shows materially less walk noise and fewer standalone atmospheric fragments
+- Targeted rerun of chunk 6 preserved the earlier improvement in separation around the errand -> crossed-legs -> love declaration sequence
+- Saved the new full reference artifact to `data/summaries/chat_md_chunks_2026-05-03_v1_2_likely_motivation_chunk2600_primary_beats.md`
+- Current state is materially healthier than the earlier `segment aggressively` version: clipping is controlled at `2600`, walk chunks are less noisy, and chunk 6 remains meaningfully segmented
